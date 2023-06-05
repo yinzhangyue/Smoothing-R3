@@ -59,7 +59,9 @@ class HotpotREPipe(Pipe):
                 "question_length": len(question_ids),
             }
 
-        data_bundle.apply_field_more(question_tokenize, field_name="question", num_proc=4)
+        data_bundle.apply_field_more(
+            question_tokenize, field_name="question", num_proc=4
+        )
 
         # document_ids doc_length doc_num
         def document_tokenize(context):
@@ -73,8 +75,12 @@ class HotpotREPipe(Pipe):
                     max_length=self.max_length,
                 )
 
-                doc_length.append(len(tokenized_document["input_ids"][1:]))  # without [CLS]
-                document_ids.append(tokenized_document["input_ids"][1:])  # without [CLS]
+                doc_length.append(
+                    len(tokenized_document["input_ids"][1:])
+                )  # without [CLS]
+                document_ids.append(
+                    tokenized_document["input_ids"][1:]
+                )  # without [CLS]
 
             return {
                 "doc_length": doc_length,
@@ -82,7 +88,9 @@ class HotpotREPipe(Pipe):
                 "doc_num": doc_num,
             }
 
-        data_bundle.apply_field_more(document_tokenize, field_name="context", num_proc=4)
+        data_bundle.apply_field_more(
+            document_tokenize, field_name="context", num_proc=4
+        )
 
         # gold_doc_pair gold_answer_doc
         def create_gold_doc_pair_and_answer_doc(instance):
@@ -106,11 +114,17 @@ class HotpotREPipe(Pipe):
         res = {}
         for path in os.listdir(paths):
             if "train" in path:
-                res["train"] = self.process(HotpotLoader()._load(os.path.join(paths, path)))
+                res["train"] = self.process(
+                    HotpotLoader()._load(os.path.join(paths, path))
+                )
             elif "dev" in path:
-                res["dev"] = self.process(HotpotLoader()._load(os.path.join(paths, path)))
+                res["dev"] = self.process(
+                    HotpotLoader()._load(os.path.join(paths, path))
+                )
             elif "test" in path:
-                res["test"] = self.process(HotpotLoader()._load(os.path.join(paths, path)))
+                res["test"] = self.process(
+                    HotpotLoader()._load(os.path.join(paths, path))
+                )
         return DataBundle(datasets=res)
 
 
@@ -129,20 +143,28 @@ class HotpotQAPipe(Pipe):
     def process(self, data_bundle: DataBundle) -> DataBundle:
         def _tokenize(instance):
             question = instance["question"]
-            sup_titles_list = list(set([sup[0] for sup in instance["supporting_facts"]]))
+            sup_titles_list = list(
+                set([sup[0] for sup in instance["supporting_facts"]])
+            )
             title_list = [con[0] for con in instance["context"]]
             sup_titles = []
             for title in title_list:
                 if title in sup_titles_list:
                     sup_titles.append(title)
             if set(sup_titles) != set(sup_titles_list):
-                warnings.warn("The required document does not appear in the document list!")
+                warnings.warn(
+                    "The required document does not appear in the document list!"
+                )
 
             assert len(sup_titles) == 2, "supporting_facts documents number is not 2"
             con_dict = {}
+            con_list = []
             for con in instance["context"]:
                 if con[0] in sup_titles:
-                    con_dict[con[0]] = [self.DOC + " " + con[0]] + [self.SEP + " " + c for c in con[1]]
+                    con_dict[con[0]] = [self.DOC + " " + con[0]] + [
+                        self.SEP + " " + c for c in con[1]
+                    ]
+                    con_list.extend(con[1])
             gold_context_list = con_dict[sup_titles[0]] + con_dict[sup_titles[1]]
             gold_context = " ".join(gold_context_list)
             # Padding side determines if we do (question|context) or (context|question).
@@ -155,7 +177,7 @@ class HotpotQAPipe(Pipe):
                 return_offsets_mapping=True,
             )
             d = dict(tokenized_examples)
-            d["gold_context_list"] = gold_context_list
+            d["con_list"] = con_list
             d["gold_context"] = gold_context
             d["sup_titles"] = sup_titles
             d["sequence_ids"] = tokenized_examples.sequence_ids(0)
@@ -163,49 +185,6 @@ class HotpotQAPipe(Pipe):
             return d
 
         data_bundle.apply_more(_tokenize, num_proc=4)
-
-        def find_start_end_positions(instance):
-            input_ids = instance["input_ids"]
-            question = instance["question"]
-            answer = instance["answer"]
-            sequence_ids = instance["sequence_ids"]
-            start_char = instance["gold_context"].find(answer)
-            offsets = instance["offset_mapping"]
-            cls_index = input_ids.index(self.tokenizer.cls_token_id)
-
-            if start_char == -1:
-                return {"start_positions": cls_index, "end_positions": cls_index}
-            else:
-                # Start/end character index of the answer in the text.
-                end_char = start_char + len(answer)
-
-                # Start token index of the current span in the text.
-                token_start_index = 0
-                while sequence_ids[token_start_index] != 1:
-                    # print(sequence_ids[token_start_index])
-                    token_start_index += 1
-
-                # End token index of the current span in the text.
-                token_end_index = len(input_ids) - 1
-                while sequence_ids[token_end_index] != 1:
-                    token_end_index -= 1
-
-                # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
-                    return {"start_positions": cls_index, "end_positions": cls_index}
-                else:
-                    # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
-                    # Note: we could go after the last offset if the answer is the last word (edge case).
-                    while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
-                        token_start_index += 1
-                    token_start_index = token_start_index - 1
-                    while offsets[token_end_index][1] >= end_char:
-                        token_end_index -= 1
-                    token_end_index = token_end_index + 1
-
-                return {"start_positions": token_start_index, "end_positions": token_end_index}
-
-        data_bundle.apply_more(find_start_end_positions, num_proc=4)
 
         def cal_sentence_labels(instance):
             sup_titles = instance["sup_titles"]
@@ -231,9 +210,93 @@ class HotpotQAPipe(Pipe):
                 sentence_labels[idx] = 1
             for idx in sup_dict[sup_titles[1]]:
                 sentence_labels[DOC0_SEP_num + idx] = 1
-            return {"sentence_labels": sentence_labels, "sentence_num": sentence_num}
+            sup_index = [
+                index for index, value in enumerate(sentence_labels) if value == 1
+            ]
+            sup_sentence_list = [instance["con_list"][index] for index in sup_index]
+            return {
+                "sentence_labels": sentence_labels,
+                "sentence_num": sentence_num,
+                "sup_sentence_list": sup_sentence_list,
+            }
 
         data_bundle.apply_more(cal_sentence_labels, num_proc=4)
+
+        def find_start_end_positions(instance):
+            input_ids = instance["input_ids"]
+            question = instance["question"]
+            answer = instance["answer"]
+            sequence_ids = instance["sequence_ids"]
+            sup_sentence_list = instance["sup_sentence_list"]
+            gold_context = instance["gold_context"]
+            # Find the first answer location in the supporting sentences
+            index = next(
+                (
+                    index
+                    for index, value in enumerate(
+                        [
+                            sup_sentence.find(answer)
+                            for sup_sentence in sup_sentence_list
+                        ]
+                    )
+                    if value != -1
+                ),
+                None,
+            )
+            # print("Index:{} \n sup_sentence_list:{}\n answer:{}\n gold_context:{}".format(index, sup_sentence_list, answer, gold_context))
+            if index is None:
+                # Find the first answer location in context
+                start_char = gold_context.find(answer)
+            else:
+                start_char = gold_context.find(
+                    sup_sentence_list[index]
+                ) + sup_sentence_list[index].find(answer)
+
+            offsets = instance["offset_mapping"]
+            cls_index = input_ids.index(self.tokenizer.cls_token_id)
+
+            if start_char == -1:
+                return {"start_positions": cls_index, "end_positions": cls_index}
+            else:
+                # Start/end character index of the answer in the text.
+                end_char = start_char + len(answer)
+
+                # Start token index of the current span in the text.
+                token_start_index = 0
+                while sequence_ids[token_start_index] != 1:
+                    # print(sequence_ids[token_start_index])
+                    token_start_index += 1
+
+                # End token index of the current span in the text.
+                token_end_index = len(input_ids) - 1
+                while sequence_ids[token_end_index] != 1:
+                    token_end_index -= 1
+
+                # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
+                if not (
+                    offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char
+                ):
+                    return {"start_positions": cls_index, "end_positions": cls_index}
+                else:
+                    # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
+                    # Note: we could go after the last offset if the answer is the last word (edge case).
+                    while (
+                        token_start_index < len(offsets)
+                        and offsets[token_start_index][0] <= start_char
+                    ):
+                        token_start_index += 1
+                    token_start_index = token_start_index - 1
+                    while offsets[token_end_index][1] >= end_char:
+                        token_end_index -= 1
+                    token_end_index = token_end_index + 1
+
+                return {
+                    "start_positions": token_start_index,
+                    "end_positions": token_end_index,
+                }
+
+        data_bundle.apply_more(find_start_end_positions, num_proc=1)
 
         def find_SEP(input_ids):
             SEP_index = []
@@ -263,7 +326,9 @@ class HotpotQAPipe(Pipe):
                 seq_len, token_start_index, token_end_index
             )
             # word_overlapping_start_label, word_overlapping_end_label = word_overlapping(seq_len, token_start_index, token_end_index, 0.2)
-            F1_smoothing_start_label, F1_smoothing_end_label = F1_smoothing_quick(seq_len, token_start_index, token_end_index)
+            F1_smoothing_start_label, F1_smoothing_end_label = F1_smoothing_quick(
+                seq_len, token_start_index, token_end_index
+            )
             return {
                 "label_smoothing_start_label": label_smoothing_start_label,
                 "label_smoothing_end_label": label_smoothing_end_label,
@@ -281,11 +346,17 @@ class HotpotQAPipe(Pipe):
         res = {}
         for path in os.listdir(paths):
             if "train" in path:
-                res["train"] = self.process(HotpotLoader()._load(os.path.join(paths, path)))
+                res["train"] = self.process(
+                    HotpotLoader()._load(os.path.join(paths, path))
+                )
             elif "dev" in path:
-                res["dev"] = self.process(HotpotLoader()._load(os.path.join(paths, path)))
+                res["dev"] = self.process(
+                    HotpotLoader()._load(os.path.join(paths, path))
+                )
             elif "test" in path:
-                res["test"] = self.process(HotpotLoader()._load(os.path.join(paths, path)))
+                res["test"] = self.process(
+                    HotpotLoader()._load(os.path.join(paths, path))
+                )
         return DataBundle(datasets=res)
 
 

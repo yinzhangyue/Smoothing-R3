@@ -9,6 +9,7 @@ CCL 2023 Best Paper: [Rethinking Label Smoothing on Multi-hop Question](https://
 ## Introduction 📝
 
 Welcome to the official repository for the paper: "[Rethinking Label Smoothing on Multi-hop Question](https://arxiv.org/pdf/2212.09512.pdf)". Our work introduces a cutting-edge Multi-Hop Question Answering (MHQA) framework, Smoothing $\mathbf{R}^3$, which integrates a series of label smoothing techniques aimed at enhancing the multi-hop reasoning process. We propose **F1 Smoothing**, an innovative approach inspired by the widely-used F1 score in Machine Reading Comprehension (MRC) tasks. Additionally, we present **LDLA ( Linear Decay Label Smoothing Algorithm)**, a pioneering label smoothing algorithm that incorporates curriculum learning principles. This repository houses both the implementation code and the datasets utilized in our research.
+
 ![Cover](figures/cover.png)
 
 

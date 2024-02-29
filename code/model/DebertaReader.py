@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 import ipdb
 
+
 ########## DebertaReader ##########
 class DebertaReader(DebertaV2PreTrainedModel):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
@@ -16,8 +17,7 @@ class DebertaReader(DebertaV2PreTrainedModel):
         self.sentence_outputs = nn.Linear(config.hidden_size, 2)
         self.answer_typeout = nn.Linear(config.hidden_size, 3)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
-        self.qa_smoothing_method = None  # ["None", "LabelSmoothing", "WordOverlapping", "F1Smoothing"]
-        self.smoothing_weight = 0
+        self.smoothing_weight = 0.1
         self.epoch = 0
 
     def forward(
@@ -36,10 +36,6 @@ class DebertaReader(DebertaV2PreTrainedModel):
         sentence_labels=None,
         answer_type=None,
         sentence_num=None,
-        label_smoothing_start_label=None,
-        label_smoothing_end_label=None,
-        word_overlapping_start_label=None,
-        word_overlapping_end_label=None,
         F1_smoothing_start_label=None,
         F1_smoothing_end_label=None,
     ):
@@ -104,43 +100,11 @@ class DebertaReader(DebertaV2PreTrainedModel):
         # Answer Span Loss
         Lspan = None
         if start_positions is not None and end_positions is not None:
-            # MRC Loss
-            if self.qa_smoothing_method is None or self.qa_smoothing_method == "None":
-                # If we are on multi-GPU, split add a dimension
-                if len(start_positions.size()) > 1:
-                    start_positions = start_positions.squeeze(-1)
-                if len(end_positions.size()) > 1:
-                    end_positions = end_positions.squeeze(-1)
-                # sometimes the start/end positions are outside our model inputs, we ignore these terms
-                batch_size, ignored_index = start_logits.size()
-                start_positions = start_positions.clamp(0, ignored_index)
-                end_positions = end_positions.clamp(0, ignored_index)
-                loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-                start_loss = loss_fct(start_logits, start_positions)
-                end_loss = loss_fct(end_logits, end_positions)
-            # Label Smoothing MRC
-            else:
-                if torch.sum(ans_mask) == 0:
-                    start_loss = torch.sum(ans_mask * torch.sum(-torch.log(start_logits.softmax(dim=-1)), dim=-1)) + torch.sum(ans_mask * torch.sum(-torch.log(end_logits.softmax(dim=-1)), dim=-1))
-                    end_loss = torch.sum(ans_mask * torch.sum(-torch.log(start_logits.softmax(dim=-1)), dim=-1)) + torch.sum(ans_mask * torch.sum(-torch.log(end_logits.softmax(dim=-1)), dim=-1))
-                elif self.qa_smoothing_method == "LabelSmoothing":
-                    start_loss = torch.sum(ans_mask * torch.sum(-torch.log(start_logits.softmax(dim=-1)) * label_smoothing_start_label, dim=-1)) / torch.sum(ans_mask)
-                    end_loss = torch.sum(ans_mask * torch.sum(-torch.log(end_logits.softmax(dim=-1)) * label_smoothing_end_label, dim=-1)) / torch.sum(ans_mask)
-                elif self.qa_smoothing_method == "WordOverlapping":
-                    start_loss = torch.sum(ans_mask * torch.sum(-torch.log(start_logits.softmax(dim=-1)) * word_overlapping_start_label, dim=-1)) / torch.sum(ans_mask)
-                    end_loss = torch.sum(ans_mask * torch.sum(-torch.log(end_logits.softmax(dim=-1)) * word_overlapping_end_label, dim=-1)) / torch.sum(ans_mask)
-                elif self.qa_smoothing_method == "F1Smoothing":
-                    start_loss = torch.sum(ans_mask * torch.sum(-torch.log(start_logits.softmax(dim=-1)) * F1_smoothing_start_label, dim=-1)) / torch.sum(ans_mask)
-                    end_loss = torch.sum(ans_mask * torch.sum(-torch.log(end_logits.softmax(dim=-1)) * F1_smoothing_end_label, dim=-1)) / torch.sum(ans_mask)
+            start_loss = torch.sum(ans_mask * torch.sum(-torch.log(start_logits.softmax(dim=-1)) * F1_smoothing_start_label, dim=-1)) / torch.sum(ans_mask)
+            end_loss = torch.sum(ans_mask * torch.sum(-torch.log(end_logits.softmax(dim=-1)) * F1_smoothing_end_label, dim=-1)) / torch.sum(ans_mask)
             Lspan = start_loss + end_loss
         # Total Loss
         total_loss = None
         if Lsentence is not None and Ltype is not None and Lspan is not None:
             total_loss = Lsentence + Lspan + Ltype
-        return {
-            "loss": total_loss,
-            "type_logits": output_answer_type,
-            "start_logits": start_logits,
-            "end_logits": end_logits,
-            "sentence_predictions": sentence_select,
-        }
+        return {"loss": total_loss, "type_logits": output_answer_type, "start_logits": start_logits, "end_logits": end_logits, "sentence_predictions": sentence_select}

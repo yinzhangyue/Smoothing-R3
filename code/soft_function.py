@@ -3,8 +3,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-plt.figure(figsize=(20, 8))
-
 
 def softmax(x):
     f_x = np.exp(x) / np.sum(np.exp(x))
@@ -132,45 +130,19 @@ def F1_smoothing_quick(seq_len: int, token_start_index: int, token_end_index: in
     idx = range(seq_len)
     answer_length = token_end_index - token_start_index + 1
     soft_start_zero = [-100] * seq_len
-    soft_start_label = [
-        fun_soft_start(i, token_start_index=token_start_index, token_end_index=token_end_index, seq_len=seq_len) for i in idx
-    ]
+    soft_start_label = [fun_soft_start(i, token_start_index=token_start_index, token_end_index=token_end_index, seq_len=seq_len) for i in idx]
     if token_start_index - answer_length + 1 >= 0:
-        soft_start_zero[token_start_index - answer_length + 1 : token_end_index + 1] = soft_start_label[
-            token_start_index - answer_length + 1 : token_end_index + 1
-        ]
+        soft_start_zero[token_start_index - answer_length + 1 : token_end_index + 1] = soft_start_label[token_start_index - answer_length + 1 : token_end_index + 1]
     else:
         soft_start_zero[: token_end_index + 1] = soft_start_label[: token_end_index + 1]
     start_seq = softmax(soft_start_zero)
 
     soft_end_zero = [-100] * seq_len
-    soft_end_label = [
-        fun_soft_end(i, token_start_index=token_start_index, token_end_index=token_end_index, seq_len=seq_len) for i in idx
-    ]
+    soft_end_label = [fun_soft_end(i, token_start_index=token_start_index, token_end_index=token_end_index, seq_len=seq_len) for i in idx]
     if token_end_index + answer_length + 1 <= seq_len:
-        soft_end_zero[token_start_index : token_end_index + answer_length + 1] = soft_end_label[
-            token_start_index : token_end_index + answer_length + 1
-        ]
+        soft_end_zero[token_start_index : token_end_index + answer_length + 1] = soft_end_label[token_start_index : token_end_index + answer_length + 1]
     else:
         soft_end_zero[token_start_index:] = soft_end_label[token_start_index:]
     end_seq = softmax(soft_end_zero)
     # Hybird Distribution
     return start_seq, end_seq
-
-
-if __name__ == "__main__":
-    seq_len = 20
-    token_start_index = 8
-    token_end_index = 15
-    # print(word_overlap_label(seq_len=10, token_start_index=2, token_end_index=5))
-    soft_start_label, soft_end_label = F1_smoothing_quick(
-        seq_len=seq_len, token_start_index=token_start_index, token_end_index=token_end_index
-    )
-    idx = range(seq_len)
-    plt.bar(idx, soft_start_label)
-    print(f"soft_start_label:{soft_start_label} sum:{np.sum(soft_start_label)}")
-    plt.savefig("pict/F1_smoothing_quick-soft_start_label.png")
-    plt.clf()
-    plt.bar(idx, soft_end_label)
-    print(f"soft_end_label:{soft_end_label} sum:{np.sum(soft_end_label)}")
-    plt.savefig("pict/F1_smoothing_quick-soft_end_label.png")

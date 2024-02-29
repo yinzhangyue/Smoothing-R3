@@ -1,7 +1,0 @@
-transformers>=4.20.0
-fastNLP
-jsonlines
-ipdb
-pandas
-torch
-ujson

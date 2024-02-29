@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 import ipdb
 
+
 ########## ElectraRetriever ##########
 class ElectraRetriever(ElectraPreTrainedModel):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
@@ -14,7 +15,6 @@ class ElectraRetriever(ElectraPreTrainedModel):
         self.num_labels = config.num_labels
         self.smoothing_weight = 0
         self.epoch = 0
-
         self.electra = ElectraModel(config)
         # Self-define layer
         self.single_document_classifier_layer = nn.Linear(config.hidden_size, 2)
@@ -73,7 +73,7 @@ class ElectraRetriever(ElectraPreTrainedModel):
                 if gold_answer_doc[b] != -1:
                     answer_distribution_labels[gold_answer_doc[b]] = 1
                 label_smoothing_labels = torch.ones((doc_num[b]), device=device, dtype=torch.float) / doc_num[b]
-                smoothing_labels = (1 - self.smoothing_weight) * (document_labels + answer_distribution_labels) + self.smoothing_weight * label_smoothing_labels
+                smoothing_labels = (1 - self.smoothing_weight) * document_labels + self.smoothing_weight * label_smoothing_labels
                 rank_loss = (torch.sum(-torch.log(document_probability.softmax(dim=-1).squeeze()[:, 1]) * smoothing_labels.squeeze(), dim=-1) + torch.sum(-torch.log(document_probability.softmax(dim=-1).squeeze()[:, 0]) * (1 - document_labels.squeeze()), dim=-1)) / doc_num[b]
                 total_rank_loss = total_rank_loss + torch.mean(rank_loss)
 

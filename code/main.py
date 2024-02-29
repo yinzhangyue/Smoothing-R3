@@ -1,4 +1,5 @@
-import sys, subprocess
+import sys
+import subprocess
 
 
 def main():
@@ -10,25 +11,20 @@ def main():
         --batch-size 1\
         --accumulation-steps 16\
         --epoch 16 \
-        --seed 42 \
-        --re-model Roberta\
-        --warmupsteps 0.2\
-        --re-smoothing-method LDLA",
+        --seed 41 \
+        --re-model Roberta",
         shell=True,
     )
     # Reader
     # subprocess.call(
     #     " CUDA_VISIBLE_DEVICES=0 python train.py \
     #         --task QA \
-    #         --lr 5e-6 \
+    #         --lr 2e-6 \
     #         --batch-size 8\
     #         --accumulation-steps 2\
-    #         --epoch 16 \
+    #         --epoch 16\
     #         --seed 41\
-    #         --qa-model Roberta\
-    #         --warmupsteps 0.1\
-    #         --evidence-smoothing-method None\
-    #         --qa-smoothing-method None",
+    #         --qa-model Deberta",
     #     shell=True,
     # )
 

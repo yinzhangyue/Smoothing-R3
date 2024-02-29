@@ -5,10 +5,6 @@
 
 CCL 2023 Best Paper: [Rethinking Label Smoothing on Multi-hop Question](https://link.springer.com/chapter/10.1007/978-981-99-6207-5_5)
 
-## Introduction 📝
-
-This repository contains the code and data related to the paper "[Rethinking Label Smoothing on Multi-hop Question](https://arxiv.org/pdf/2212.09512.pdf)". In this paper, we introduce label smoothing into the MHQA task. We
-
 
 ## Introduction 📝
 
@@ -20,7 +16,6 @@ Welcome to the official repository for the paper: "[Rethinking Label Smoothing o
 
 - [Rethinking Label Smoothing on Multi-hop Question](#rethinking-label-smoothing-on-multi-hop-question)
   - [Introduction 📝](#introduction-)
-  - [Introduction 📝](#introduction--1)
   - [Quick Links 🔗](#quick-links-)
   - [Requirements 📚](#requirements-)
   - [Data 💾](#data-)
@@ -44,6 +39,7 @@ Please make sure you have the following requirements installed:
 - pandas
 - torch
 - ujson
+
 
 ## Data 💾
 
